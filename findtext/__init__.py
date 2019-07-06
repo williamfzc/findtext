@@ -6,8 +6,12 @@ from PIL import Image
 
 
 class WordBlock(object):
-    def __init__(self, location: typing.Union[list, tuple], content: str):
+    def __init__(self, box: dict, location: typing.Union[list, tuple], content: str):
+        # reused by other calculations
+        self.box = box
+        # human readable location
         self.location = location
+        # ocr content (text)
         self.content = content
 
 
@@ -36,16 +40,18 @@ class FindText(object):
                 ocr_result = api.GetUTF8Text()
                 word_list.append(
                     WordBlock(
+                        box=box,
                         location=self._get_border_point_from_box(box),
                         content=ocr_result
                     )
                 )
         return word_list
 
-    def find(self,
-             image_path: str = None,
-             image_object: np.ndarray = None,
-             find_type: str = None):
+    def _find(self,
+              image_path: str = None,
+              image_object: np.ndarray = None,
+              find_type: str = None) -> typing.List[WordBlock]:
+        """ SHOULD NOT be used directly """
         if image_path:
             image_object = cv2.imread(image_path)
         if image_object is None:
@@ -55,10 +61,20 @@ class FindText(object):
             'textline': RIL.TEXTLINE,
             'word': RIL.WORD,
         }
-        if not find_type:
-            find_type = 'word'
-        find_type: int = find_type_dict[find_type]
+
+        assert find_type, 'find type must be filled'
+        find_type_code: int = find_type_dict[find_type]
 
         # do not change the raw image
         image = Image.fromarray(image_object)
-        return self._get_word_block_list_from_image(image, find_type)
+        return self._get_word_block_list_from_image(image, find_type_code)
+
+    def find_text_line(self,
+                       image_path: str = None,
+                       image_object: np.ndarray = None) -> typing.List[WordBlock]:
+        return self._find(image_path, image_object, 'textline')
+
+    def find_word(self,
+                  image_path: str = None,
+                  image_object: np.ndarray = None) -> typing.List[WordBlock]:
+        return self._find(image_path, image_object, 'word')
