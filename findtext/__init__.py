@@ -56,10 +56,17 @@ class FindText(object):
             lang = 'eng'
         self.lang = lang
 
-    def _get_word_block_list_from_image(self, image: Image, find_type: int) -> typing.List[WordBlock]:
+    def _get_word_block_list_from_image(self,
+                                        image: Image,
+                                        find_type: int,
+                                        spec_box: dict = None) -> typing.List[WordBlock]:
         word_list = list()
         with PyTessBaseAPI(lang=self.lang) as api:
             api.SetImage(image)
+            if spec_box:
+                ocr_result = api.GetUTF8Text()
+                return [WordBlock(box=spec_box, content=ocr_result)]
+
             boxes = api.GetComponentImages(find_type, True)
             for _, box, *_ in boxes:
                 api.SetRectangle(box['x'], box['y'], box['w'], box['h'])
@@ -84,7 +91,8 @@ class FindText(object):
     def _find(self,
               image_path: str = None,
               image_object: np.ndarray = None,
-              find_type: str = None) -> typing.List[WordBlock]:
+              find_type: str = None,
+              spec_box: dict = None) -> typing.List[WordBlock]:
         """ SHOULD NOT be used directly """
         image_object = self._get_img_object(image_path, image_object)
 
@@ -98,7 +106,7 @@ class FindText(object):
 
         # do not change the raw image
         image = Image.fromarray(image_object)
-        return self._get_word_block_list_from_image(image, find_type_code)
+        return self._get_word_block_list_from_image(image, find_type_code, spec_box)
 
     @staticmethod
     def crop_object(image_object: np.ndarray,
@@ -117,9 +125,10 @@ class FindText(object):
                   image_path: str = None,
                   image_object: np.ndarray = None,
                   deep: bool = None,
-                  offset: int = None) -> typing.List[WordBlock]:
+                  offset: int = None,
+                  *args, **kwargs) -> typing.List[WordBlock]:
         if not deep:
-            return self._find(image_path, image_object, 'word')
+            return self._find(image_path, image_object, 'word', *args, **kwargs)
         if not offset:
             offset = 0
 
@@ -152,22 +161,4 @@ class FindText(object):
                 }
                 each_word.update_box(new_box)
             final_word_list.extend(word_list)
-
-        # word content fix
-        for each_word in final_word_list:
-            # ignore some detected words
-            if each_word.content:
-                continue
-
-            sub_image = self.crop_object(
-                image_object,
-                each_word.left_top_point[0],
-                each_word.right_bottom_point[0],
-                each_word.left_top_point[1],
-                each_word.right_bottom_point[1])
-            gaussian = cv2.GaussianBlur(sub_image, (3, 3), 0)
-            _, sub_bin_image = cv2.threshold(gaussian, 200, 255, cv2.THRESH_BINARY)
-            new_word = self.find_word(image_object=sub_bin_image)
-            if new_word:
-                each_word.content = new_word[0].content
         return final_word_list
