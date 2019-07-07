@@ -3,6 +3,7 @@ import cv2
 import typing
 import locale
 from tesserocr import PyTessBaseAPI, RIL
+import tesserocr
 from PIL import Image
 
 locale.setlocale(locale.LC_ALL, "C")
@@ -55,6 +56,19 @@ class FindText(object):
         if not lang:
             lang = 'eng'
         self.lang = lang
+
+    def __str__(self):
+        return f'<FindText Object lang={self.lang}>'
+
+    __repr__ = __str__
+
+    @staticmethod
+    def get_data_home() -> str:
+        return tesserocr.get_languages()[0]
+
+    @staticmethod
+    def get_available_lang() -> list:
+        return tesserocr.get_languages()[1]
 
     def _get_word_block_list_from_image(self,
                                         image: Image,
